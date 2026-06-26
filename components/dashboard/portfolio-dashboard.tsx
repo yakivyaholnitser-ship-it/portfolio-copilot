@@ -187,8 +187,9 @@ function DashboardReady({
 }) {
   return (
     <div className="grid gap-6">
-      <ActionCard recommendation={copilot.questions.shouldIDoAnything} />
-      <DailyChangeCard summary={copilot.questions.whatChangedToday} />
+      <ActionCard recommendation={copilot.morningBrief.todaysDecision} />
+      <DailyChangeCard summary={copilot.morningBrief.whatChangedOvernight} />
+      <MorningBriefDetails copilot={copilot} />
       <DecisionFactorsCard decision={copilot.decision} />
       <PriceCard quote={copilot.quote} />
 
@@ -209,6 +210,43 @@ function DashboardReady({
         </section>
       )}
     </div>
+  );
+}
+
+function MorningBriefDetails({ copilot }: { readonly copilot: CopilotResponse }) {
+  return (
+    <section className="grid gap-4 lg:grid-cols-3">
+      <BriefDetail
+        label="Biggest opportunity"
+        value={copilot.morningBrief.biggestOpportunity}
+      />
+      <BriefDetail label="Biggest risk" value={copilot.morningBrief.biggestRisk} />
+      <BriefDetail
+        label="Upcoming events"
+        value={copilot.morningBrief.upcomingEvents.join(" ")}
+        meta={`${copilot.morningBrief.estimatedReadingTime} read`}
+      />
+    </section>
+  );
+}
+
+function BriefDetail({
+  label,
+  value,
+  meta,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly meta?: string;
+}) {
+  return (
+    <article className="rounded-lg border border-white/10 bg-white/[0.05] p-5">
+      <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-base leading-7 text-slate-200">{value}</p>
+      {meta ? <p className="mt-4 text-sm text-cyan-200">{meta}</p> : null}
+    </article>
   );
 }
 

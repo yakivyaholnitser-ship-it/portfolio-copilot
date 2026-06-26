@@ -2,23 +2,22 @@ import type { DecisionResult } from "@/types/decision";
 import type { PortfolioPosition } from "@/types/portfolio";
 import type { Quote } from "@/types/quote";
 
-export type InvestmentBrainKind = "market" | "position" | "risk" | "decision";
+export type InvestmentBrainKind =
+  | "market"
+  | "portfolio"
+  | "risk"
+  | "opportunity"
+  | "calendar";
 
 export interface InvestmentBrain {
   readonly kind: InvestmentBrainKind;
   readonly headline: string;
-  readonly observations: readonly string[];
-  readonly score: number;
+  readonly summary: string;
+  readonly importance: number;
+  readonly confidence: number;
 }
 
-export interface PositionBrain extends InvestmentBrain {
-  readonly ownerNotes: readonly {
-    readonly owner: string;
-    readonly note: string;
-  }[];
-}
-
-export interface DailyChangeSummary {
+export interface WhatChangedOvernight {
   readonly headline: string;
   readonly bullets: readonly string[];
 }
@@ -36,16 +35,23 @@ export interface ActionRecommendation {
   readonly userAction: string;
 }
 
-export interface CopilotBrains {
+export interface MorningBriefBrains {
   readonly market: InvestmentBrain;
-  readonly position: PositionBrain;
+  readonly portfolio: InvestmentBrain;
   readonly risk: InvestmentBrain;
-  readonly decision: InvestmentBrain;
+  readonly opportunity: InvestmentBrain;
+  readonly calendar: InvestmentBrain;
 }
 
-export interface CopilotQuestions {
-  readonly whatChangedToday: DailyChangeSummary;
-  readonly shouldIDoAnything: ActionRecommendation;
+export interface MorningBrief {
+  readonly todaysDecision: ActionRecommendation;
+  readonly why: string;
+  readonly biggestOpportunity: string;
+  readonly biggestRisk: string;
+  readonly whatChangedOvernight: WhatChangedOvernight;
+  readonly upcomingEvents: readonly string[];
+  readonly estimatedReadingTime: string;
+  readonly brains: MorningBriefBrains;
 }
 
 export interface CopilotResponse {
@@ -55,7 +61,6 @@ export interface CopilotResponse {
   readonly quote: Quote;
   readonly positions: readonly PortfolioPosition[];
   readonly decision: DecisionResult;
-  readonly brains: CopilotBrains;
-  readonly questions: CopilotQuestions;
+  readonly morningBrief: MorningBrief;
   readonly disclaimer: "Not financial advice.";
 }

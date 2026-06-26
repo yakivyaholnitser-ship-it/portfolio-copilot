@@ -1,7 +1,7 @@
-import type { DailyChangeSummary } from "@/types/copilot";
+import type { WhatChangedOvernight } from "@/types/copilot";
 
 interface DailyChangeCardProps {
-  readonly summary: DailyChangeSummary;
+  readonly summary: WhatChangedOvernight;
 }
 
 export function DailyChangeCard({ summary }: DailyChangeCardProps) {

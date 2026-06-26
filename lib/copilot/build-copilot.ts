@@ -2,15 +2,18 @@ import { scoreStock } from "@/lib/decision/score-stock";
 import type {
   ActionAnswer,
   ActionRecommendation,
-  CopilotBrains,
   CopilotResponse,
-  DailyChangeSummary,
   InvestmentBrain,
-  PositionBrain,
+  MorningBrief,
+  MorningBriefBrains,
 } from "@/types/copilot";
 import type { DecisionResult } from "@/types/decision";
 import type { PortfolioResponse } from "@/types/portfolio";
 import type { Quote } from "@/types/quote";
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
 
 function round(value: number, digits = 1) {
   return Number(value.toFixed(digits));
@@ -26,14 +29,30 @@ function formatPercent(value: number) {
   return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}%`;
 }
 
-function scoreToConfidence(score: number) {
-  return Math.min(100, Math.max(0, Math.round(score)));
+function confidenceFromImportance(importance: number) {
+  return Math.round(clamp(importance, 0, 100));
 }
 
-function createMarketBrain(quote: Quote): InvestmentBrain {
+function createBrain(
+  kind: InvestmentBrain["kind"],
+  headline: string,
+  summary: string,
+  importance: number,
+  confidence = confidenceFromImportance(importance),
+): InvestmentBrain {
+  return {
+    kind,
+    headline,
+    summary,
+    importance: Math.round(clamp(importance, 0, 100)),
+    confidence: Math.round(clamp(confidence, 0, 100)),
+  };
+}
+
+function MarketBrain(quote: Quote): InvestmentBrain {
   const spread = quote.wsLikePrice - quote.marketPrice;
   const spreadPercent = quote.marketPrice === 0 ? 0 : (spread / quote.marketPrice) * 100;
-  const score = Math.min(10, Math.max(0, 5 + quote.todayChangePercent));
+  const absoluteMove = Math.abs(quote.todayChangePercent);
   const direction =
     quote.todayChangePercent > 1
       ? "positive"
@@ -41,97 +60,116 @@ function createMarketBrain(quote: Quote): InvestmentBrain {
         ? "negative"
         : "muted";
 
-  return {
-    kind: "market",
-    headline: `Market move is ${direction} today.`,
-    observations: [
-      `Today change is ${formatPercent(quote.todayChangePercent)}.`,
-      `Reference price is ${formatCurrency(quote.wsLikePrice)} versus market price ${formatCurrency(quote.marketPrice)}.`,
-      `Reference spread is ${formatPercent(spreadPercent)} from market price.`,
-      `Current session is ${quote.session}.`,
-    ],
-    score: round(score),
-  };
+  return createBrain(
+    "market",
+    `Market move is ${direction} today.`,
+    `STX is ${formatPercent(quote.todayChangePercent)} today. Reference price is ${formatCurrency(quote.wsLikePrice)} versus market price ${formatCurrency(quote.marketPrice)}, a ${formatPercent(spreadPercent)} spread in the ${quote.session} session.`,
+    clamp(45 + absoluteMove * 8, 35, 90),
+    quote.session === "regular" ? 86 : 72,
+  );
 }
 
-function createPositionBrain(portfolio: PortfolioResponse): PositionBrain {
-  const ownerNotes = portfolio.positions.map((position) => ({
-    owner: position.owner,
-    note: position.isPositive
-      ? `${position.owner} has an unrealized gain of ${formatPercent(position.gainPercent)}.`
-      : `${position.owner} remains below entry by ${Math.abs(position.gainPercent).toFixed(1)}%.`,
-  }));
-  const averageGain =
-    portfolio.positions.reduce((sum, position) => sum + position.gainPercent, 0) /
-    portfolio.positions.length;
-  const score = Math.min(10, Math.max(0, 5 + averageGain / 10));
+function PortfolioBrain(portfolio: PortfolioResponse): InvestmentBrain {
+  const position = portfolio.positions[0];
 
-  return {
-    kind: "position",
-    headline:
-      averageGain >= 0
-        ? `${portfolio.displayName}'s position P/L is constructive.`
-        : `${portfolio.displayName}'s position P/L is under pressure.`,
-    observations: ownerNotes.map((item) => item.note),
-    ownerNotes,
-    score: round(score),
-  };
+  if (!position) {
+    return createBrain(
+      "portfolio",
+      "No configured position is available.",
+      "Portfolio impact cannot be evaluated until a position is configured.",
+      20,
+      90,
+    );
+  }
+
+  const headline = position.isPositive
+    ? `${portfolio.displayName}'s position has a strong unrealized gain.`
+    : `${portfolio.displayName}'s position is still below entry.`;
+  const summary = position.isPositive
+    ? `${portfolio.displayName} is up ${formatPercent(position.gainPercent)} from a ${formatCurrency(position.bought)} entry.`
+    : `${portfolio.displayName} is down ${Math.abs(position.gainPercent).toFixed(1)}% from a ${formatCurrency(position.bought)} entry.`;
+
+  return createBrain(
+    "portfolio",
+    headline,
+    summary,
+    clamp(45 + Math.abs(position.gainPercent), 40, 95),
+    90,
+  );
 }
 
-function createRiskBrain(quote: Quote): InvestmentBrain {
-  const dailyMove = Math.abs(quote.todayChangePercent);
-  const volatilityScore = Math.min(10, Math.max(0, 10 - dailyMove * 1.5));
+function RiskBrain(quote: Quote): InvestmentBrain {
+  const absoluteMove = Math.abs(quote.todayChangePercent);
   const sessionRisk =
     quote.session === "regular"
-      ? "regular session liquidity is clearer"
+      ? "regular session pricing is clearer"
       : `${quote.session} session pricing can be less reliable`;
+  const headline =
+    absoluteMove >= 5
+      ? "Risk is elevated because the daily move is large."
+      : "Risk is moderate and mostly tied to session context.";
 
-  return {
-    kind: "risk",
-    headline:
-      dailyMove >= 4
-        ? "Daily volatility is elevated."
-        : "Daily volatility looks manageable.",
-    observations: [
-      `Absolute daily move is ${dailyMove.toFixed(1)}%.`,
-      `Session risk note: ${sessionRisk}.`,
-    ],
-    score: round(volatilityScore),
-  };
+  return createBrain(
+    "risk",
+    headline,
+    `Absolute daily move is ${absoluteMove.toFixed(1)}%, and ${sessionRisk}.`,
+    clamp(35 + absoluteMove * 10 + (quote.session === "regular" ? 0 : 12), 25, 95),
+    quote.session === "regular" ? 82 : 70,
+  );
 }
 
-function createDecisionBrain(decision: DecisionResult): InvestmentBrain {
-  return {
-    kind: "decision",
-    headline: `${decision.signal} from deterministic decision scoring.`,
-    observations: [
-      `Total score is ${decision.totalScore}/100.`,
-      `Momentum ${decision.factorScores.momentum}/10, position P/L ${decision.factorScores.positionPl}/10.`,
-      `Volatility ${decision.factorScores.volatility}/10, session ${decision.factorScores.session}/10.`,
-    ],
-    score: round(decision.totalScore / 10),
-  };
-}
-
-function createDailyChangeSummary(
+function OpportunityBrain(
   portfolio: PortfolioResponse,
-  brains: CopilotBrains,
-): DailyChangeSummary {
-  return {
-    headline: brains.market.headline,
-    bullets: [
-      brains.market.observations[0],
-      brains.market.observations[1],
-      brains.position.headline,
-      brains.risk.headline,
-    ],
-  };
+  decision: DecisionResult,
+): InvestmentBrain {
+  const position = portfolio.positions[0];
+  const hasLargeGain = Boolean(position && position.gainPercent >= 50);
+  const hasBelowEntryPosition = Boolean(position && position.gainPercent < 0);
+
+  if (hasLargeGain && decision.totalScore >= 70) {
+    return createBrain(
+      "opportunity",
+      "Opportunity is to review gains before concentration grows.",
+      "Strong momentum and a large unrealized gain create a useful moment to review target allocation.",
+      86,
+      78,
+    );
+  }
+
+  if (hasBelowEntryPosition && decision.factorScores.momentum >= 7) {
+    return createBrain(
+      "opportunity",
+      "Opportunity is to reassess the thesis without rushing.",
+      "Momentum improved while the position remains below entry, so the useful action is review, not reaction.",
+      68,
+      74,
+    );
+  }
+
+  return createBrain(
+    "opportunity",
+    "Opportunity is limited today.",
+    "The current setup does not create a strong new opportunity signal.",
+    45,
+    72,
+  );
 }
 
-function getUserAction(
-  answer: ActionAnswer,
-  portfolio: PortfolioResponse,
-) {
+function CalendarBrain(quote: Quote): InvestmentBrain {
+  const isClosed = quote.session === "closed";
+
+  return createBrain(
+    "calendar",
+    isClosed ? "No market-hours event is active right now." : "Market session is active.",
+    isClosed
+      ? "No scheduled events are configured yet. Next useful check is the next market session."
+      : "No scheduled events are configured yet. Watch session liquidity and price confirmation.",
+    isClosed ? 35 : 50,
+    65,
+  );
+}
+
+function getUserAction(answer: ActionAnswer, portfolio: PortfolioResponse) {
   const position = portfolio.positions[0];
 
   if (!position) {
@@ -155,19 +193,17 @@ function getUserAction(
   return "No immediate action suggested.";
 }
 
-function createActionRecommendation(
+function createTodaysDecision(
   portfolio: PortfolioResponse,
   decision: DecisionResult,
+  brains: MorningBriefBrains,
 ): ActionRecommendation {
-  const hasLargeWinner = portfolio.positions.some(
-    (position) => position.gainPercent >= 50,
-  );
-  const hasMeaningfulLoser = portfolio.positions.some(
-    (position) => position.gainPercent <= -10,
-  );
+  const position = portfolio.positions[0];
   const dailyMove = Math.abs(portfolio.quote.todayChangePercent);
+  const hasLargeWinner = Boolean(position && position.gainPercent >= 50);
+  const hasMeaningfulLoser = Boolean(position && position.gainPercent <= -10);
   const answer: ActionAnswer =
-    decision.signal === "Caution" || dailyMove >= 5
+    decision.signal === "Caution" || brains.risk.importance >= 85 || dailyMove >= 5
       ? "Caution"
       : hasLargeWinner && decision.totalScore >= 70
         ? "Consider trimming"
@@ -176,18 +212,64 @@ function createActionRecommendation(
           : "No action";
   const reason =
     answer === "Consider trimming"
-      ? "Decision score is strong, but at least one position has a large unrealized gain."
+      ? "The strongest signal is a large unrealized gain with a favorable decision score."
       : answer === "Caution"
-        ? "Risk is elevated because the daily move or decision score needs caution."
+        ? "Risk is high enough that the next decision should be slower and more deliberate."
         : answer === "Review"
-          ? "The setup is mixed enough to review targets and risk without rushing."
-          : "The decision score and risk factors do not suggest immediate action.";
+          ? "The setup is mixed enough to review the position without rushing."
+          : "The market, portfolio, and risk brains do not suggest immediate action.";
 
   return {
     answer,
-    confidence: scoreToConfidence(decision.totalScore),
+    confidence: Math.round(clamp(decision.totalScore, 0, 100)),
     reason,
     userAction: getUserAction(answer, portfolio),
+  };
+}
+
+function estimateReadingTime(textParts: readonly string[]) {
+  const words = textParts
+    .join(" ")
+    .split(/\s+/)
+    .filter(Boolean).length;
+  const minutes = Math.max(1, Math.ceil(words / 180));
+
+  return `${minutes} min`;
+}
+
+function BriefEngine(
+  portfolio: PortfolioResponse,
+  decision: DecisionResult,
+  brains: MorningBriefBrains,
+): MorningBrief {
+  const todaysDecision = createTodaysDecision(portfolio, decision, brains);
+  const whatChangedOvernight = {
+    headline: brains.market.headline,
+    bullets: [
+      brains.market.summary,
+      brains.portfolio.summary,
+      brains.risk.summary,
+    ],
+  };
+  const upcomingEvents = [brains.calendar.summary];
+  const textParts = [
+    todaysDecision.reason,
+    brains.market.summary,
+    brains.portfolio.summary,
+    brains.risk.summary,
+    brains.opportunity.summary,
+    brains.calendar.summary,
+  ];
+
+  return {
+    todaysDecision,
+    why: `${brains.market.headline} ${brains.portfolio.headline} ${decision.explanation}`,
+    biggestOpportunity: brains.opportunity.headline,
+    biggestRisk: brains.risk.headline,
+    whatChangedOvernight,
+    upcomingEvents,
+    estimatedReadingTime: estimateReadingTime(textParts),
+    brains,
   };
 }
 
@@ -196,11 +278,12 @@ export function buildCopilotResponse(portfolio: PortfolioResponse): CopilotRespo
     quote: portfolio.quote,
     positions: portfolio.positions,
   });
-  const brains: CopilotBrains = {
-    market: createMarketBrain(portfolio.quote),
-    position: createPositionBrain(portfolio),
-    risk: createRiskBrain(portfolio.quote),
-    decision: createDecisionBrain(decision),
+  const brains: MorningBriefBrains = {
+    market: MarketBrain(portfolio.quote),
+    portfolio: PortfolioBrain(portfolio),
+    risk: RiskBrain(portfolio.quote),
+    opportunity: OpportunityBrain(portfolio, decision),
+    calendar: CalendarBrain(portfolio.quote),
   };
 
   return {
@@ -210,11 +293,7 @@ export function buildCopilotResponse(portfolio: PortfolioResponse): CopilotRespo
     quote: portfolio.quote,
     positions: portfolio.positions,
     decision,
-    brains,
-    questions: {
-      whatChangedToday: createDailyChangeSummary(portfolio, brains),
-      shouldIDoAnything: createActionRecommendation(portfolio, decision),
-    },
+    morningBrief: BriefEngine(portfolio, decision, brains),
     disclaimer: "Not financial advice.",
   };
 }
