@@ -1,7 +1,8 @@
 import type { PortfolioPosition, PortfolioResponse } from "@/types/portfolio";
 import type { Quote } from "@/types/quote";
+import type { DecisionResult, DecisionSignal } from "@/types/decision";
 
-export type BriefSignal = "Bullish" | "Hold" | "Caution";
+export type BriefSignal = DecisionSignal;
 
 export interface PortfolioBrief {
   readonly signal: BriefSignal;
@@ -29,6 +30,7 @@ export interface BriefInput {
 }
 
 export interface BriefResponse extends PortfolioResponse {
+  readonly decision: DecisionResult;
   readonly brief: PortfolioBrief;
   readonly disclaimer: "Not financial advice.";
 }

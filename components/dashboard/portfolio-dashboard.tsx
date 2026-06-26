@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react";
 
+import { ActionCard } from "@/components/dashboard/action-card";
 import { AiBriefCard } from "@/components/dashboard/ai-brief-card";
+import { DailyChangeCard } from "@/components/dashboard/daily-change-card";
+import { DecisionFactorsCard } from "@/components/dashboard/decision-factors-card";
 import { PositionCard } from "@/components/dashboard/position-card";
 import { PriceCard } from "@/components/dashboard/price-card";
 import type { ApiResponse } from "@/types/api";
 import type { BriefResponse } from "@/types/brief";
+import type { CopilotResponse } from "@/types/copilot";
 
 interface PortfolioDashboardProps {
   readonly symbol: string;
@@ -15,7 +19,11 @@ interface PortfolioDashboardProps {
 type LoadState =
   | { readonly status: "loading" }
   | { readonly status: "error"; readonly message: string }
-  | { readonly status: "ready"; readonly data: BriefResponse };
+  | {
+      readonly status: "ready";
+      readonly copilot: CopilotResponse;
+      readonly brief: BriefResponse | null;
+    };
 
 function isErrorResponse<TData>(
   response: ApiResponse<TData>,
@@ -29,25 +37,46 @@ export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
   useEffect(() => {
     const controller = new AbortController();
 
-    async function loadBrief() {
+    async function loadDashboard() {
       setState({ status: "loading" });
 
       try {
-        const response = await fetch(`/api/brief?symbol=${encodeURIComponent(symbol)}`, {
+        const copilotResponse = await fetch(`/api/copilot?symbol=${encodeURIComponent(symbol)}`, {
           signal: controller.signal,
         });
-        const payload = (await response.json()) as ApiResponse<BriefResponse>;
+        const copilotPayload =
+          (await copilotResponse.json()) as ApiResponse<CopilotResponse>;
 
-        if (!response.ok || isErrorResponse(payload)) {
-          const message = isErrorResponse(payload)
-            ? payload.error.message
-            : "Unable to load portfolio brief.";
+        if (!copilotResponse.ok || isErrorResponse(copilotPayload)) {
+          const message = isErrorResponse(copilotPayload)
+            ? copilotPayload.error.message
+            : "Unable to load portfolio copilot.";
 
           setState({ status: "error", message });
           return;
         }
 
-        setState({ status: "ready", data: payload.data });
+        setState({
+          status: "ready",
+          copilot: copilotPayload.data,
+          brief: null,
+        });
+
+        const briefResponse = await fetch(`/api/brief?symbol=${encodeURIComponent(symbol)}`, {
+          signal: controller.signal,
+        });
+        const briefPayload =
+          (await briefResponse.json()) as ApiResponse<BriefResponse>;
+
+        if (!briefResponse.ok || isErrorResponse(briefPayload)) {
+          return;
+        }
+
+        setState({
+          status: "ready",
+          copilot: copilotPayload.data,
+          brief: briefPayload.data,
+        });
       } catch (error) {
         if (controller.signal.aborted) {
           return;
@@ -58,12 +87,12 @@ export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
           message:
             error instanceof Error
               ? error.message
-              : "Unable to load portfolio brief.",
+              : "Unable to load portfolio copilot.",
         });
       }
     }
 
-    void loadBrief();
+    void loadDashboard();
 
     return () => {
       controller.abort();
@@ -88,31 +117,51 @@ export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
             </h1>
           </div>
           <p className="max-w-md text-sm leading-6 text-slate-400">
-            Live quote context, owner-level P/L, and a concise AI brief for the
-            configured STX portfolio.
+            Deterministic product answers, decision factors, owner-level P/L,
+            and an AI-written explanation for the configured STX portfolio.
           </p>
         </header>
 
         {state.status === "loading" ? <DashboardLoading /> : null}
         {state.status === "error" ? <DashboardError message={state.message} /> : null}
-        {state.status === "ready" ? <DashboardReady data={state.data} /> : null}
+        {state.status === "ready" ? (
+          <DashboardReady copilot={state.copilot} brief={state.brief} />
+        ) : null}
       </div>
     </main>
   );
 }
 
-function DashboardReady({ data }: { readonly data: BriefResponse }) {
+function DashboardReady({
+  copilot,
+  brief,
+}: {
+  readonly copilot: CopilotResponse;
+  readonly brief: BriefResponse | null;
+}) {
   return (
     <div className="grid gap-6">
-      <PriceCard quote={data.quote} />
+      <ActionCard recommendation={copilot.questions.shouldIDoAnything} />
+      <DailyChangeCard summary={copilot.questions.whatChangedToday} />
+      <DecisionFactorsCard decision={copilot.decision} />
+      <PriceCard quote={copilot.quote} />
 
       <section className="grid gap-4 lg:grid-cols-2">
-        {data.positions.map((position) => (
+        {copilot.positions.map((position) => (
           <PositionCard key={position.owner} position={position} />
         ))}
       </section>
 
-      <AiBriefCard brief={data.brief} disclaimer={data.disclaimer} />
+      {brief ? (
+        <AiBriefCard brief={brief.brief} disclaimer={brief.disclaimer} />
+      ) : (
+        <section className="rounded-lg border border-white/10 bg-white/[0.04] p-6">
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
+            AI brief
+          </p>
+          <p className="mt-3 text-slate-300">Preparing explanation...</p>
+        </section>
+      )}
     </div>
   );
 }

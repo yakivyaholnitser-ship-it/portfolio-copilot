@@ -1,12 +1,10 @@
 import { apiError, ok } from "@/lib/api/http";
-import { createOpenAiBrief } from "@/lib/brief/openai-brief-provider";
 import { scoreStock } from "@/lib/decision/score-stock";
 import {
   getPortfolio,
   PortfolioNotFoundError,
 } from "@/lib/portfolio/get-portfolio";
 import { normalizeSymbol } from "@/lib/utils/symbol";
-import { toBriefInput, type BriefResponse } from "@/types/brief";
 
 export const dynamic = "force-dynamic";
 
@@ -17,27 +15,19 @@ export async function GET(request: Request) {
   if (!symbol) {
     return apiError(
       "INVALID_SYMBOL",
-      "Provide a valid symbol query parameter, for example /api/brief?symbol=STX.",
+      "Provide a valid symbol query parameter, for example /api/decision?symbol=STX.",
       { status: 400 },
     );
   }
 
   try {
     const portfolio = await getPortfolio(symbol);
-    const briefInput = toBriefInput(portfolio);
     const decision = scoreStock({
       quote: portfolio.quote,
       positions: portfolio.positions,
     });
-    const brief = await createOpenAiBrief(briefInput, decision);
-    const response: BriefResponse = {
-      ...portfolio,
-      decision,
-      brief,
-      disclaimer: "Not financial advice.",
-    };
 
-    return ok(response);
+    return ok(decision);
   } catch (error) {
     if (error instanceof PortfolioNotFoundError) {
       return apiError("PORTFOLIO_NOT_FOUND", error.message, { status: 404 });
@@ -46,8 +36,8 @@ export async function GET(request: Request) {
     const message =
       error instanceof Error
         ? error.message
-        : "Unable to retrieve brief data.";
+        : "Unable to score stock decision.";
 
-    return apiError("BRIEF_PROVIDER_ERROR", message, { status: 502 });
+    return apiError("DECISION_PROVIDER_ERROR", message, { status: 502 });
   }
 }
