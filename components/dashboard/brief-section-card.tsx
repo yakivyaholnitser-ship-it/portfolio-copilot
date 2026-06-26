@@ -1,10 +1,18 @@
+import { Explainer } from "@/components/dashboard/explainer";
+
 interface BriefSectionCardProps {
   readonly title: string;
   readonly value?: string;
   readonly bullets?: readonly string[];
+  readonly explanation?: string;
 }
 
-export function BriefSectionCard({ title, value, bullets }: BriefSectionCardProps) {
+export function BriefSectionCard({
+  title,
+  value,
+  bullets,
+  explanation,
+}: BriefSectionCardProps) {
   return (
     <section className="rounded-lg border border-white/10 bg-white/[0.045] p-6">
       <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
@@ -21,6 +29,7 @@ export function BriefSectionCard({ title, value, bullets }: BriefSectionCardProp
           ))}
         </ul>
       ) : null}
+      {explanation ? <Explainer>{explanation}</Explainer> : null}
     </section>
   );
 }

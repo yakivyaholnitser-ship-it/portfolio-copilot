@@ -8,6 +8,7 @@ import type {
   MorningBriefBrains,
 } from "@/types/copilot";
 import type { DecisionResult } from "@/types/decision";
+import type { IntelligenceResponse } from "@/types/intelligence";
 import type { PortfolioResponse } from "@/types/portfolio";
 import type { Quote } from "@/types/quote";
 
@@ -27,6 +28,14 @@ function formatPercent(value: number) {
   const rounded = Math.abs(value) < 0.05 ? 0 : value;
 
   return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}%`;
+}
+
+function shorten(text: string, maxLength: number) {
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, maxLength - 1).trim()}...`;
 }
 
 function confidenceFromImportance(importance: number) {
@@ -49,7 +58,10 @@ function createBrain(
   };
 }
 
-function MarketBrain(quote: Quote): InvestmentBrain {
+function MarketBrain(
+  quote: Quote,
+  intelligence: IntelligenceResponse,
+): InvestmentBrain {
   const spread = quote.wsLikePrice - quote.marketPrice;
   const spreadPercent = quote.marketPrice === 0 ? 0 : (spread / quote.marketPrice) * 100;
   const absoluteMove = Math.abs(quote.todayChangePercent);
@@ -59,13 +71,53 @@ function MarketBrain(quote: Quote): InvestmentBrain {
       : quote.todayChangePercent < -1
         ? "negative"
         : "muted";
+  const topNews = intelligence.news[0];
+  const newsSentence = topNews ? ` Latest news: ${shorten(topNews.headline, 96)}.` : "";
 
   return createBrain(
     "market",
-    `Market move is ${direction} today.`,
-    `STX is ${formatPercent(quote.todayChangePercent)} today. Reference price is ${formatCurrency(quote.wsLikePrice)} versus market price ${formatCurrency(quote.marketPrice)}, a ${formatPercent(spreadPercent)} spread in the ${quote.session} session.`,
-    clamp(45 + absoluteMove * 8, 35, 90),
-    quote.session === "regular" ? 86 : 72,
+    topNews ? `Market move is ${direction}; news may be relevant.` : `Market move is ${direction} today.`,
+    `${quote.symbol} is ${formatPercent(quote.todayChangePercent)} today.${newsSentence} Reference and market prices are nearly aligned in the ${quote.session} session.`,
+    clamp(45 + absoluteMove * 8 + (topNews ? 8 : 0), 35, 94),
+    topNews ? 78 : quote.session === "regular" ? 86 : 72,
+  );
+}
+
+function AnalystBrain(intelligence: IntelligenceResponse): InvestmentBrain {
+  const latestTrend = intelligence.analystRecommendations[0];
+
+  if (!latestTrend) {
+    return createBrain(
+      "analyst",
+      "No analyst recommendation trend is available.",
+      "Finnhub did not return a current recommendation trend for this symbol.",
+      25,
+      intelligence.sources.finnhub.status === "available" ? 70 : 45,
+    );
+  }
+
+  const positive = latestTrend.strongBuy + latestTrend.buy;
+  const negative = latestTrend.sell + latestTrend.strongSell;
+  const countSummary = `${positive} Buy / ${latestTrend.hold} Hold / ${negative} Sell`;
+  const headline =
+    positive > negative + latestTrend.hold
+      ? "Analyst trend leans positive."
+      : negative > positive
+        ? "Analyst trend shows caution."
+        : "Analyst trend is mixed or neutral.";
+  const interpretation =
+    positive > negative + latestTrend.hold
+      ? "Analyst consensus remains strongly positive."
+      : negative > positive
+        ? "Analyst consensus has a cautious tilt."
+        : "Analyst consensus looks balanced.";
+
+  return createBrain(
+    "analyst",
+    headline,
+    `${interpretation} ${countSummary}.`,
+    clamp(35 + Math.abs(positive - negative) * 8, 35, 85),
+    72,
   );
 }
 
@@ -98,23 +150,32 @@ function PortfolioBrain(portfolio: PortfolioResponse): InvestmentBrain {
   );
 }
 
-function RiskBrain(quote: Quote): InvestmentBrain {
+function RiskBrain(
+  quote: Quote,
+  intelligence: IntelligenceResponse,
+): InvestmentBrain {
   const absoluteMove = Math.abs(quote.todayChangePercent);
+  const recentInsider = intelligence.insiders[0];
   const sessionRisk =
     quote.session === "regular"
       ? "regular session pricing is clearer"
       : `${quote.session} session pricing can be less reliable`;
   const headline =
-    absoluteMove >= 5
-      ? "Risk is elevated because the daily move is large."
-      : "Risk is moderate and mostly tied to session context.";
+    recentInsider
+      ? "Risk includes recent insider activity."
+      : absoluteMove >= 5
+        ? "Risk is elevated because the daily move is large."
+        : "Risk is moderate and mostly tied to session context.";
+  const insiderSentence = recentInsider
+    ? " Recent insider selling deserves monitoring, but it is not automatically bearish."
+    : "";
 
   return createBrain(
     "risk",
     headline,
-    `Absolute daily move is ${absoluteMove.toFixed(1)}%, and ${sessionRisk}.`,
-    clamp(35 + absoluteMove * 10 + (quote.session === "regular" ? 0 : 12), 25, 95),
-    quote.session === "regular" ? 82 : 70,
+    `Absolute daily move is ${absoluteMove.toFixed(1)}%, and ${sessionRisk}.${insiderSentence}`,
+    clamp(35 + absoluteMove * 10 + (quote.session === "regular" ? 0 : 12) + (recentInsider ? 8 : 0), 25, 95),
+    recentInsider ? 76 : quote.session === "regular" ? 82 : 70,
   );
 }
 
@@ -129,8 +190,8 @@ function OpportunityBrain(
   if (hasLargeGain && decision.totalScore >= 70) {
     return createBrain(
       "opportunity",
-      "Opportunity is to review gains before concentration grows.",
-      "Strong momentum and a large unrealized gain create a useful moment to review target allocation.",
+      "Review your target or partial-profit rules.",
+      "A gain above 100% makes target and partial-profit rules worth reviewing.",
       86,
       78,
     );
@@ -139,8 +200,8 @@ function OpportunityBrain(
   if (hasBelowEntryPosition && decision.factorScores.momentum >= 7) {
     return createBrain(
       "opportunity",
-      "Opportunity is to reassess the thesis without rushing.",
-      "Momentum improved while the position remains below entry, so the useful action is review, not reaction.",
+      "Track break-even and avoid reacting to one-day moves.",
+      "Momentum improved while the position remains below entry, so break-even is the useful reference point.",
       68,
       74,
     );
@@ -155,8 +216,22 @@ function OpportunityBrain(
   );
 }
 
-function CalendarBrain(quote: Quote): InvestmentBrain {
+function CalendarBrainWithIntelligence(
+  quote: Quote,
+  intelligence: IntelligenceResponse,
+): InvestmentBrain {
   const isClosed = quote.session === "closed";
+  const nextEarnings = intelligence.earnings[0];
+
+  if (nextEarnings) {
+    return createBrain(
+      "calendar",
+      `Upcoming earnings event on ${nextEarnings.date}.`,
+      `Finnhub calendar shows ${nextEarnings.symbol} earnings on ${nextEarnings.date}. EPS estimate: ${nextEarnings.epsEstimate ?? "unknown"}.`,
+      82,
+      74,
+    );
+  }
 
   return createBrain(
     "calendar",
@@ -185,9 +260,7 @@ function getUserAction(answer: ActionAnswer, portfolio: PortfolioResponse) {
   }
 
   if (answer === "Review") {
-    return position.isPositive
-      ? "Positive position; review target calmly."
-      : "Below entry; review risk before changing anything.";
+    return "Review the position, but no immediate trade is suggested.";
   }
 
   return "No immediate action suggested.";
@@ -202,22 +275,23 @@ function createTodaysDecision(
   const dailyMove = Math.abs(portfolio.quote.todayChangePercent);
   const hasLargeWinner = Boolean(position && position.gainPercent >= 50);
   const hasMeaningfulLoser = Boolean(position && position.gainPercent <= -10);
-  const answer: ActionAnswer =
-    decision.signal === "Caution" || brains.risk.importance >= 85 || dailyMove >= 5
-      ? "Caution"
-      : hasLargeWinner && decision.totalScore >= 70
-        ? "Consider trimming"
-        : hasMeaningfulLoser || decision.totalScore < 70
-          ? "Review"
-          : "No action";
-  const reason =
-    answer === "Consider trimming"
-      ? "The strongest signal is a large unrealized gain with a favorable decision score."
-      : answer === "Caution"
-        ? "Risk is high enough that the next decision should be slower and more deliberate."
-        : answer === "Review"
-          ? "The setup is mixed enough to review the position without rushing."
-          : "The market, portfolio, and risk brains do not suggest immediate action.";
+  const riskIsElevated = brains.risk.importance >= 85 || dailyMove >= 5;
+  let answer: ActionAnswer = "No action";
+  let reason = "The market, portfolio, and risk brains do not suggest immediate action.";
+
+  if (riskIsElevated) {
+    answer = "Review";
+    reason = "Risk is elevated, but the brief does not suggest an immediate trade.";
+  } else if (decision.signal === "Caution") {
+    answer = "Caution";
+    reason = "Risk is high enough that the next decision should be slower and more deliberate.";
+  } else if (hasLargeWinner && decision.totalScore >= 70) {
+    answer = "Consider trimming";
+    reason = "The strongest signal is a large unrealized gain with a favorable decision score.";
+  } else if (hasMeaningfulLoser || decision.totalScore < 70) {
+    answer = "Review";
+    reason = "The setup is mixed enough to review the position without rushing.";
+  }
 
   return {
     answer,
@@ -243,18 +317,30 @@ function BriefEngine(
   brains: MorningBriefBrains,
 ): MorningBrief {
   const todaysDecision = createTodaysDecision(portfolio, decision, brains);
+  const position = portfolio.positions[0];
+  const topNews = brains.market.summary.includes("Latest news")
+    ? brains.market.summary.match(/Latest news: (.*)\. Reference/)?.[1]
+    : null;
+  const insider = brains.risk.summary.includes("insider selling")
+    ? "Insider activity was detected recently."
+    : null;
   const whatChangedOvernight = {
     headline: brains.market.headline,
     bullets: [
-      brains.market.summary,
-      brains.portfolio.summary,
-      brains.risk.summary,
-    ],
+      `${portfolio.symbol} ${portfolio.quote.todayChangePercent >= 0 ? "rose" : "fell"} ${formatPercent(portfolio.quote.todayChangePercent)} today.`,
+      ...(topNews ? [`Latest news: ${shorten(topNews, 78)}.`] : []),
+      brains.analyst.kind === "analyst" ? brains.analyst.summary : "",
+      insider ??
+        (position
+          ? `${portfolio.displayName} is ${position.isPositive ? "above" : "below"} entry.`
+          : "Position data is unavailable."),
+    ].filter(Boolean).slice(0, 4),
   };
   const upcomingEvents = [brains.calendar.summary];
   const textParts = [
     todaysDecision.reason,
     brains.market.summary,
+    brains.analyst.summary,
     brains.portfolio.summary,
     brains.risk.summary,
     brains.opportunity.summary,
@@ -273,17 +359,21 @@ function BriefEngine(
   };
 }
 
-export function buildCopilotResponse(portfolio: PortfolioResponse): CopilotResponse {
+export function buildCopilotResponse(
+  portfolio: PortfolioResponse,
+  intelligence: IntelligenceResponse,
+): CopilotResponse {
   const decision = scoreStock({
     quote: portfolio.quote,
     positions: portfolio.positions,
   });
   const brains: MorningBriefBrains = {
-    market: MarketBrain(portfolio.quote),
+    market: MarketBrain(portfolio.quote, intelligence),
+    analyst: AnalystBrain(intelligence),
     portfolio: PortfolioBrain(portfolio),
-    risk: RiskBrain(portfolio.quote),
+    risk: RiskBrain(portfolio.quote, intelligence),
     opportunity: OpportunityBrain(portfolio, decision),
-    calendar: CalendarBrain(portfolio.quote),
+    calendar: CalendarBrainWithIntelligence(portfolio.quote, intelligence),
   };
 
   return {
@@ -293,6 +383,7 @@ export function buildCopilotResponse(portfolio: PortfolioResponse): CopilotRespo
     quote: portfolio.quote,
     positions: portfolio.positions,
     decision,
+    intelligence,
     morningBrief: BriefEngine(portfolio, decision, brains),
     disclaimer: "Not financial advice.",
   };

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { AiBriefCard } from "@/components/dashboard/ai-brief-card";
 import { BriefSectionCard } from "@/components/dashboard/brief-section-card";
 import { DecisionFactorsCard } from "@/components/dashboard/decision-factors-card";
+import { HowBriefBuiltCard } from "@/components/dashboard/how-brief-built-card";
 import { MorningBriefHero } from "@/components/dashboard/morning-brief-hero";
 import { PositionCard } from "@/components/dashboard/position-card";
 import { PriceCard } from "@/components/dashboard/price-card";
@@ -201,6 +202,8 @@ function DashboardReady({
           <p className="mt-3 text-slate-300">Preparing explanation...</p>
         </section>
       )}
+
+      <HowBriefBuiltCard />
     </div>
   );
 }
@@ -208,22 +211,33 @@ function DashboardReady({
 function MorningBriefSections({ copilot }: { readonly copilot: CopilotResponse }) {
   return (
     <section className="grid gap-4">
-      <BriefSectionCard title="Why" value={copilot.morningBrief.why} />
+      <BriefSectionCard
+        title="Why"
+        value={copilot.morningBrief.why}
+        explanation="This connects the main recommendation to the market move, your personal position, and the deterministic score."
+      />
       <BriefSectionCard
         title="What Changed Overnight"
         value={copilot.morningBrief.whatChangedOvernight.headline}
         bullets={copilot.morningBrief.whatChangedOvernight.bullets}
+        explanation="This summarizes the new information the brief detected since the latest quote update."
       />
       <div className="grid gap-4 lg:grid-cols-2">
-        <BriefSectionCard title="Biggest Risk" value={copilot.morningBrief.biggestRisk} />
+        <BriefSectionCard
+          title="Biggest Risk"
+          value={copilot.morningBrief.biggestRisk}
+          explanation="This highlights what could make a rushed decision worse today."
+        />
         <BriefSectionCard
           title="Biggest Opportunity"
           value={copilot.morningBrief.biggestOpportunity}
+          explanation="This is the most useful thing to review today, not a prediction or buy signal."
         />
       </div>
       <BriefSectionCard
         title="Upcoming Events"
         bullets={copilot.morningBrief.upcomingEvents}
+        explanation="This flags scheduled or session-related items that may affect when to check again."
       />
     </section>
   );

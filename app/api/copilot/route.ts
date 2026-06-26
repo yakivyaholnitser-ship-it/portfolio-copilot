@@ -1,5 +1,6 @@
 import { apiError, ok } from "@/lib/api/http";
 import { buildCopilotResponse } from "@/lib/copilot/build-copilot";
+import { getIntelligence } from "@/lib/intelligence/get-intelligence";
 import {
   getPortfolio,
   PortfolioNotFoundError,
@@ -23,8 +24,9 @@ export async function GET(request: Request) {
 
   try {
     const portfolio = await getPortfolio({ userId, symbol });
+    const intelligence = await getIntelligence(portfolio.symbol);
 
-    return ok(buildCopilotResponse(portfolio));
+    return ok(buildCopilotResponse(portfolio, intelligence));
   } catch (error) {
     if (error instanceof PortfolioNotFoundError) {
       return apiError("PORTFOLIO_NOT_FOUND", error.message, { status: 404 });

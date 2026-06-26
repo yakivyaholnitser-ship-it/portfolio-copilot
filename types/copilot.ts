@@ -1,9 +1,11 @@
 import type { DecisionResult } from "@/types/decision";
+import type { IntelligenceResponse } from "@/types/intelligence";
 import type { PortfolioPosition } from "@/types/portfolio";
 import type { Quote } from "@/types/quote";
 
 export type InvestmentBrainKind =
   | "market"
+  | "analyst"
   | "portfolio"
   | "risk"
   | "opportunity"
@@ -37,6 +39,7 @@ export interface ActionRecommendation {
 
 export interface MorningBriefBrains {
   readonly market: InvestmentBrain;
+  readonly analyst: InvestmentBrain;
   readonly portfolio: InvestmentBrain;
   readonly risk: InvestmentBrain;
   readonly opportunity: InvestmentBrain;
@@ -61,6 +64,7 @@ export interface CopilotResponse {
   readonly quote: Quote;
   readonly positions: readonly PortfolioPosition[];
   readonly decision: DecisionResult;
+  readonly intelligence: IntelligenceResponse;
   readonly morningBrief: MorningBrief;
   readonly disclaimer: "Not financial advice.";
 }

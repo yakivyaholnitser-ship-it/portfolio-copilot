@@ -1,3 +1,4 @@
+import { Explainer } from "@/components/dashboard/explainer";
 import type { CopilotResponse } from "@/types/copilot";
 
 interface MorningBriefHeroProps {
@@ -54,6 +55,11 @@ export function MorningBriefHero({ copilot }: MorningBriefHeroProps) {
         </p>
         <p className="mt-2 text-base leading-7 text-slate-100">{decision.userAction}</p>
       </div>
+
+      <Explainer>
+        Today's Decision is the main action label from the deterministic Morning
+        Brief and Decision Engine. It is guidance for review, not a trade command.
+      </Explainer>
     </section>
   );
 }
