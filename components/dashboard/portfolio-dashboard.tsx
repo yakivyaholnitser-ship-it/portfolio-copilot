@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-import { ActionCard } from "@/components/dashboard/action-card";
 import { AiBriefCard } from "@/components/dashboard/ai-brief-card";
-import { DailyChangeCard } from "@/components/dashboard/daily-change-card";
+import { BriefSectionCard } from "@/components/dashboard/brief-section-card";
 import { DecisionFactorsCard } from "@/components/dashboard/decision-factors-card";
+import { MorningBriefHero } from "@/components/dashboard/morning-brief-hero";
 import { PositionCard } from "@/components/dashboard/position-card";
 import { PriceCard } from "@/components/dashboard/price-card";
 import { getInvestorOptions } from "@/lib/config/portfolio";
@@ -127,8 +127,7 @@ export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
             </h1>
           </div>
           <p className="max-w-md text-sm leading-6 text-slate-400">
-            Deterministic product answers, decision factors, owner-level P/L,
-            and an AI-written explanation for the configured STX portfolio.
+            A calm morning briefing for the decision that matters today.
           </p>
         </header>
 
@@ -187,17 +186,10 @@ function DashboardReady({
 }) {
   return (
     <div className="grid gap-6">
-      <ActionCard recommendation={copilot.morningBrief.todaysDecision} />
-      <DailyChangeCard summary={copilot.morningBrief.whatChangedOvernight} />
-      <MorningBriefDetails copilot={copilot} />
-      <DecisionFactorsCard decision={copilot.decision} />
-      <PriceCard quote={copilot.quote} />
+      <MorningBriefHero copilot={copilot} />
+      <MorningBriefSections copilot={copilot} />
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        {copilot.positions.map((position) => (
-          <PositionCard key={position.owner} position={position} />
-        ))}
-      </section>
+      <DetailsSection copilot={copilot} />
 
       {brief ? (
         <AiBriefCard brief={brief.brief} disclaimer={brief.disclaimer} />
@@ -213,52 +205,66 @@ function DashboardReady({
   );
 }
 
-function MorningBriefDetails({ copilot }: { readonly copilot: CopilotResponse }) {
+function MorningBriefSections({ copilot }: { readonly copilot: CopilotResponse }) {
   return (
-    <section className="grid gap-4 lg:grid-cols-3">
-      <BriefDetail
-        label="Biggest opportunity"
-        value={copilot.morningBrief.biggestOpportunity}
+    <section className="grid gap-4">
+      <BriefSectionCard title="Why" value={copilot.morningBrief.why} />
+      <BriefSectionCard
+        title="What Changed Overnight"
+        value={copilot.morningBrief.whatChangedOvernight.headline}
+        bullets={copilot.morningBrief.whatChangedOvernight.bullets}
       />
-      <BriefDetail label="Biggest risk" value={copilot.morningBrief.biggestRisk} />
-      <BriefDetail
-        label="Upcoming events"
-        value={copilot.morningBrief.upcomingEvents.join(" ")}
-        meta={`${copilot.morningBrief.estimatedReadingTime} read`}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <BriefSectionCard title="Biggest Risk" value={copilot.morningBrief.biggestRisk} />
+        <BriefSectionCard
+          title="Biggest Opportunity"
+          value={copilot.morningBrief.biggestOpportunity}
+        />
+      </div>
+      <BriefSectionCard
+        title="Upcoming Events"
+        bullets={copilot.morningBrief.upcomingEvents}
       />
     </section>
   );
 }
 
-function BriefDetail({
-  label,
-  value,
-  meta,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly meta?: string;
-}) {
+function DetailsSection({ copilot }: { readonly copilot: CopilotResponse }) {
   return (
-    <article className="rounded-lg border border-white/10 bg-white/[0.05] p-5">
-      <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-2 text-base leading-7 text-slate-200">{value}</p>
-      {meta ? <p className="mt-4 text-sm text-cyan-200">{meta}</p> : null}
-    </article>
+    <section className="mt-4 grid gap-5 rounded-lg border border-white/10 bg-slate-950/40 p-5">
+      <div>
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500">
+          Details
+        </p>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+          Market data, personal position P/L, and deterministic Decision Engine
+          factors. Useful, but secondary to the morning brief.
+        </p>
+      </div>
+
+      <PriceCard quote={copilot.quote} />
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        {copilot.positions.map((position) => (
+          <PositionCard key={`${position.owner}-${position.symbol}`} position={position} />
+        ))}
+      </section>
+
+      <DecisionFactorsCard decision={copilot.decision} />
+    </section>
   );
 }
 
 function DashboardLoading() {
   return (
     <div className="grid gap-6">
-      <div className="h-56 animate-pulse rounded-lg border border-white/10 bg-white/[0.06]" />
+      <div className="h-80 animate-pulse rounded-lg border border-white/10 bg-white/[0.06]" />
+      <div className="h-48 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" />
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="h-52 animate-pulse rounded-lg border border-white/10 bg-white/[0.05]" />
-        <div className="h-52 animate-pulse rounded-lg border border-white/10 bg-white/[0.05]" />
+        <div className="h-40 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" />
+        <div className="h-40 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" />
       </div>
-      <div className="h-64 animate-pulse rounded-lg border border-white/10 bg-white/[0.06]" />
+      <div className="h-64 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" />
     </div>
   );
 }
@@ -267,7 +273,7 @@ function DashboardError({ message }: { readonly message: string }) {
   return (
     <section className="rounded-lg border border-rose-300/20 bg-rose-950/30 p-6">
       <p className="text-sm font-medium uppercase tracking-[0.18em] text-rose-200">
-        Could not load dashboard
+        Could not load briefing
       </p>
       <p className="mt-3 text-lg text-rose-50">{message}</p>
     </section>
