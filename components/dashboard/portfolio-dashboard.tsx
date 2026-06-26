@@ -6,11 +6,13 @@ import { AiBriefCard } from "@/components/dashboard/ai-brief-card";
 import { BriefSectionCard } from "@/components/dashboard/brief-section-card";
 import { DecisionFactorsCard } from "@/components/dashboard/decision-factors-card";
 import { HowBriefBuiltCard } from "@/components/dashboard/how-brief-built-card";
+import { InvestmentCommittee } from "@/components/dashboard/investment-committee";
 import { MorningBriefHero } from "@/components/dashboard/morning-brief-hero";
 import { PositionCard } from "@/components/dashboard/position-card";
 import { PriceCard } from "@/components/dashboard/price-card";
 import { getInvestorOptions } from "@/lib/config/portfolio";
 import type { ApiResponse } from "@/types/api";
+import type { AdvisorsResponse } from "@/types/advisor";
 import type { BriefResponse } from "@/types/brief";
 import type { CopilotResponse } from "@/types/copilot";
 
@@ -25,6 +27,7 @@ type LoadState =
       readonly status: "ready";
       readonly copilot: CopilotResponse;
       readonly brief: BriefResponse | null;
+      readonly advisors: AdvisorsResponse | null;
     };
 
 const investorOptions = getInvestorOptions();
@@ -33,6 +36,26 @@ function isErrorResponse<TData>(
   response: ApiResponse<TData>,
 ): response is Extract<ApiResponse<TData>, { error: unknown }> {
   return "error" in response;
+}
+
+async function readOptionalData<TData>(
+  result: PromiseSettledResult<Response>,
+): Promise<TData | null> {
+  if (result.status === "rejected") {
+    return null;
+  }
+
+  try {
+    const payload = (await result.value.json()) as ApiResponse<TData>;
+
+    if (!result.value.ok || isErrorResponse(payload)) {
+      return null;
+    }
+
+    return payload.data;
+  } catch {
+    return null;
+  }
 }
 
 export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
@@ -71,22 +94,26 @@ export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
           status: "ready",
           copilot: copilotPayload.data,
           brief: null,
+          advisors: null,
         });
 
-        const briefResponse = await fetch(`/api/brief?${params.toString()}`, {
-          signal: controller.signal,
-        });
-        const briefPayload =
-          (await briefResponse.json()) as ApiResponse<BriefResponse>;
+        const [briefResult, advisorsResult] = await Promise.allSettled([
+          fetch(`/api/brief?${params.toString()}`, {
+            signal: controller.signal,
+          }),
+          fetch(`/api/advisors?${params.toString()}`, {
+            signal: controller.signal,
+          }),
+        ]);
 
-        if (!briefResponse.ok || isErrorResponse(briefPayload)) {
-          return;
-        }
+        const brief = await readOptionalData<BriefResponse>(briefResult);
+        const advisors = await readOptionalData<AdvisorsResponse>(advisorsResult);
 
         setState({
           status: "ready",
           copilot: copilotPayload.data,
-          brief: briefPayload.data,
+          brief,
+          advisors,
         });
       } catch (error) {
         if (controller.signal.aborted) {
@@ -140,7 +167,11 @@ export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
         {state.status === "loading" ? <DashboardLoading /> : null}
         {state.status === "error" ? <DashboardError message={state.message} /> : null}
         {state.status === "ready" ? (
-          <DashboardReady copilot={state.copilot} brief={state.brief} />
+          <DashboardReady
+            copilot={state.copilot}
+            brief={state.brief}
+            advisors={state.advisors}
+          />
         ) : null}
       </div>
     </main>
@@ -181,14 +212,17 @@ function UserSwitcher({
 function DashboardReady({
   copilot,
   brief,
+  advisors,
 }: {
   readonly copilot: CopilotResponse;
   readonly brief: BriefResponse | null;
+  readonly advisors: AdvisorsResponse | null;
 }) {
   return (
     <div className="grid gap-6">
       <MorningBriefHero copilot={copilot} />
       <MorningBriefSections copilot={copilot} />
+      <InvestmentCommittee advisors={advisors?.advisors ?? copilot.advisors} />
 
       <DetailsSection copilot={copilot} />
 
