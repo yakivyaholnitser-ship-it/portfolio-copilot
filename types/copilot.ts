@@ -33,8 +33,7 @@ export interface ActionRecommendation {
   readonly answer: ActionAnswer;
   readonly confidence: number;
   readonly reason: string;
-  readonly yakivAction: string;
-  readonly anastasiiaAction: string;
+  readonly userAction: string;
 }
 
 export interface CopilotBrains {
@@ -50,6 +49,8 @@ export interface CopilotQuestions {
 }
 
 export interface CopilotResponse {
+  readonly userId: string;
+  readonly displayName: string;
   readonly symbol: string;
   readonly quote: Quote;
   readonly positions: readonly PortfolioPosition[];

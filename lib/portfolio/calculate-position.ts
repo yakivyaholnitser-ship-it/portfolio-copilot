@@ -1,6 +1,6 @@
 import type {
   PortfolioPosition,
-  PortfolioPositionConfig,
+  InvestorPositionConfig,
 } from "@/types/portfolio";
 
 function roundMoney(value: number) {
@@ -12,14 +12,16 @@ function roundPercent(value: number) {
 }
 
 export function calculatePortfolioPosition(
-  position: PortfolioPositionConfig,
+  position: InvestorPositionConfig,
   referencePrice: number,
+  owner: string,
 ): PortfolioPosition {
   const gainDollarPerShare = referencePrice - position.bought;
   const gainPercent = (gainDollarPerShare / position.bought) * 100;
 
   return {
-    owner: position.owner,
+    owner,
+    symbol: position.symbol,
     bought: position.bought,
     referencePrice,
     gainDollarPerShare: roundMoney(gainDollarPerShare),

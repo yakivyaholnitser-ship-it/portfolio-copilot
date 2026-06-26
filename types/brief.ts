@@ -9,8 +9,7 @@ export interface PortfolioBrief {
   /** Integer confidence from 0 to 100. */
   readonly confidence: number;
   readonly summary: string;
-  readonly yakivNote: string;
-  readonly anastasiiaNote: string;
+  readonly userNote: string;
 }
 
 export interface BriefPositionInput {
@@ -21,6 +20,8 @@ export interface BriefPositionInput {
 }
 
 export interface BriefInput {
+  readonly userId: string;
+  readonly displayName: string;
   readonly symbol: string;
   readonly marketPrice: number;
   readonly wsLikePrice: number;
@@ -56,6 +57,8 @@ export function toBriefPositionInput(
 
 export function toBriefInput(portfolio: PortfolioResponse): BriefInput {
   return {
+    userId: portfolio.userId,
+    displayName: portfolio.displayName,
     symbol: portfolio.symbol,
     marketPrice: roundDollar(portfolio.quote.marketPrice),
     wsLikePrice: roundDollar(portfolio.quote.wsLikePrice),

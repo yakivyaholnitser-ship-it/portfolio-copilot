@@ -70,8 +70,8 @@ function createPositionBrain(portfolio: PortfolioResponse): PositionBrain {
     kind: "position",
     headline:
       averageGain >= 0
-        ? "Combined position P/L is constructive."
-        : "Combined position P/L is under pressure.",
+        ? `${portfolio.displayName}'s position P/L is constructive.`
+        : `${portfolio.displayName}'s position P/L is under pressure.`,
     observations: ownerNotes.map((item) => item.note),
     ownerNotes,
     score: round(score),
@@ -128,12 +128,11 @@ function createDailyChangeSummary(
   };
 }
 
-function getOwnerAction(
-  owner: string,
+function getUserAction(
   answer: ActionAnswer,
   portfolio: PortfolioResponse,
 ) {
-  const position = portfolio.positions.find((item) => item.owner === owner);
+  const position = portfolio.positions[0];
 
   if (!position) {
     return "No configured position.";
@@ -188,8 +187,7 @@ function createActionRecommendation(
     answer,
     confidence: scoreToConfidence(decision.totalScore),
     reason,
-    yakivAction: getOwnerAction("Yakiv", answer, portfolio),
-    anastasiiaAction: getOwnerAction("Anastasiia", answer, portfolio),
+    userAction: getUserAction(answer, portfolio),
   };
 }
 
@@ -206,6 +204,8 @@ export function buildCopilotResponse(portfolio: PortfolioResponse): CopilotRespo
   };
 
   return {
+    userId: portfolio.userId,
+    displayName: portfolio.displayName,
     symbol: portfolio.symbol,
     quote: portfolio.quote,
     positions: portfolio.positions,

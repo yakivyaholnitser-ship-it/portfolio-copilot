@@ -9,18 +9,19 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const userId = searchParams.get("user")?.trim().toLowerCase();
   const symbol = normalizeSymbol(searchParams.get("symbol"));
 
-  if (!symbol) {
+  if (!userId) {
     return apiError(
-      "INVALID_SYMBOL",
-      "Provide a valid symbol query parameter, for example /api/portfolio?symbol=STX.",
+      "INVALID_USER",
+      "Provide a valid user query parameter, for example /api/portfolio?user=yakiv.",
       { status: 400 },
     );
   }
 
   try {
-    const response = await getPortfolio(symbol);
+    const response = await getPortfolio({ userId, symbol });
 
     return ok(response);
   } catch (error) {

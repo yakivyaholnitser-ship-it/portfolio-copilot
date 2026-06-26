@@ -1,27 +1,41 @@
-import type { PortfolioConfig } from "@/types/portfolio";
+import type { InvestorConfig } from "@/types/portfolio";
 
-export const portfolios = {
-  STX: {
-    symbol: "STX",
+export const investors = {
+  yakiv: {
+    id: "yakiv",
+    displayName: "Yakiv",
     positions: [
       {
-        owner: "Yakiv",
+        symbol: "STX",
         bought: 452.75,
       },
+    ],
+  },
+  anastasiia: {
+    id: "anastasiia",
+    displayName: "Anastasiia",
+    positions: [
       {
-        owner: "Anastasiia",
+        symbol: "STX",
         bought: 1108.22,
       },
     ],
   },
-} as const satisfies Record<string, PortfolioConfig>;
+} as const satisfies Record<string, InvestorConfig>;
 
-export type PortfolioSymbol = keyof typeof portfolios;
+export type InvestorId = keyof typeof investors;
 
-export function getPortfolioConfig(symbol: string): PortfolioConfig | null {
-  const normalizedSymbol = symbol.toUpperCase();
+export function getInvestorConfig(userId: string): InvestorConfig | null {
+  const normalizedUserId = userId.toLowerCase();
 
-  return normalizedSymbol in portfolios
-    ? portfolios[normalizedSymbol as PortfolioSymbol]
+  return normalizedUserId in investors
+    ? investors[normalizedUserId as InvestorId]
     : null;
+}
+
+export function getInvestorOptions() {
+  return Object.values(investors).map((investor) => ({
+    id: investor.id,
+    displayName: investor.displayName,
+  }));
 }

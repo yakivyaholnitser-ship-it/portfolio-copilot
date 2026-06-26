@@ -13,8 +13,7 @@ export function createFallbackBrief(
     signal: decision.signal,
     confidence: clampConfidence(decision.totalScore),
     summary: createSummary(decision.signal, decision.factorScores),
-    yakivNote: createOwnerNote(input, "Yakiv"),
-    anastasiiaNote: createOwnerNote(input, "Anastasiia"),
+    userNote: createOwnerNote(input),
   };
 }
 
@@ -37,11 +36,11 @@ function createSummary(
     : "Price action is mixed, so the brief favors patience over reaction.";
 }
 
-function createOwnerNote(input: BriefInput, owner: string) {
-  const position = input.positions.find((item) => item.owner === owner);
+function createOwnerNote(input: BriefInput) {
+  const position = input.positions[0];
 
   if (!position) {
-    return `${owner} has no configured position.`;
+    return `${input.displayName} has no configured position.`;
   }
 
   if (position.gainPercent >= 50) {

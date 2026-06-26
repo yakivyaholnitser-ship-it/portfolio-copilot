@@ -29,24 +29,21 @@ export function ActionCard({ recommendation }: ActionCardProps) {
         {recommendation.reason}
       </p>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <OwnerAction owner="Yakiv" value={recommendation.yakivAction} />
-        <OwnerAction owner="Anastasiia" value={recommendation.anastasiiaAction} />
+        <OwnerAction value={recommendation.userAction} />
       </div>
     </section>
   );
 }
 
 function OwnerAction({
-  owner,
   value,
 }: {
-  readonly owner: string;
   readonly value: string;
 }) {
   return (
     <div className="rounded-lg border border-white/10 bg-slate-950/40 p-4">
       <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-        {owner}
+        Personal action
       </p>
       <p className="mt-2 text-base leading-7 text-slate-200">{value}</p>
     </div>

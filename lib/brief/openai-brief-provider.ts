@@ -19,8 +19,7 @@ const openAiResponsesUrl = "https://api.openai.com/v1/responses";
 
 interface PortfolioBriefCopy {
   readonly summary: string;
-  readonly yakivNote: string;
-  readonly anastasiiaNote: string;
+  readonly userNote: string;
 }
 
 function wordLimit(value: string, maxWords: number) {
@@ -37,10 +36,8 @@ function isPortfolioBriefCopy(value: unknown): value is PortfolioBriefCopy {
   return (
     typeof candidate.summary === "string" &&
     wordLimit(candidate.summary, 22) &&
-    typeof candidate.yakivNote === "string" &&
-    wordLimit(candidate.yakivNote, 14) &&
-    typeof candidate.anastasiiaNote === "string" &&
-    wordLimit(candidate.anastasiiaNote, 14)
+    typeof candidate.userNote === "string" &&
+    wordLimit(candidate.userNote, 14)
   );
 }
 
@@ -74,7 +71,7 @@ const developerPrompt = [
   "Explain the provided signal, totalScore, and factors in plain language.",
   "Avoid direct buy, sell, or trade commands.",
   "summary must be at most 22 words.",
-  "yakivNote and anastasiiaNote must each be at most 14 words.",
+  "userNote must be personal to the selected investor and at most 14 words.",
   "Prefer language like: 'Strong unrealized gain; consider reviewing your target.'",
   "Do not mention that this is not financial advice inside the JSON.",
 ].join(" ");
@@ -132,21 +129,16 @@ export async function createOpenAiBrief(
               additionalProperties: false,
               required: [
                 "summary",
-                "yakivNote",
-                "anastasiiaNote",
+                "userNote",
               ],
               properties: {
                 summary: {
                   type: "string",
                   description: "Maximum 22 words.",
                 },
-                yakivNote: {
+                userNote: {
                   type: "string",
-                  description: "Maximum 14 words.",
-                },
-                anastasiiaNote: {
-                  type: "string",
-                  description: "Maximum 14 words.",
+                  description: "Personal note for the selected investor. Maximum 14 words.",
                 },
               },
             },

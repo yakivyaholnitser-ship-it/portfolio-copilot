@@ -33,9 +33,8 @@ export function AiBriefCard({ brief, disclaimer }: AiBriefCardProps) {
 
       <p className="mt-6 text-xl leading-8 text-slate-100">{brief.summary}</p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <Note label="Yakiv" value={brief.yakivNote} />
-        <Note label="Anastasiia" value={brief.anastasiiaNote} />
+      <div className="mt-6">
+        <Note label="Personal note" value={brief.userNote} />
       </div>
 
       <p className="mt-6 text-sm text-slate-500">{disclaimer}</p>

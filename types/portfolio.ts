@@ -1,17 +1,19 @@
 import type { Quote } from "@/types/quote";
 
-export interface PortfolioPositionConfig {
-  readonly owner: string;
+export interface InvestorPositionConfig {
+  readonly symbol: string;
   readonly bought: number;
 }
 
-export interface PortfolioConfig {
-  readonly symbol: string;
-  readonly positions: readonly PortfolioPositionConfig[];
+export interface InvestorConfig {
+  readonly id: string;
+  readonly displayName: string;
+  readonly positions: readonly InvestorPositionConfig[];
 }
 
 export interface PortfolioPosition {
   readonly owner: string;
+  readonly symbol: string;
   readonly bought: number;
   readonly referencePrice: number;
   readonly gainDollarPerShare: number;
@@ -20,6 +22,8 @@ export interface PortfolioPosition {
 }
 
 export interface PortfolioResponse {
+  readonly userId: string;
+  readonly displayName: string;
   readonly symbol: string;
   readonly quote: Quote;
   readonly positions: readonly PortfolioPosition[];

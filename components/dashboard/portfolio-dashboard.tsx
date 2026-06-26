@@ -8,6 +8,7 @@ import { DailyChangeCard } from "@/components/dashboard/daily-change-card";
 import { DecisionFactorsCard } from "@/components/dashboard/decision-factors-card";
 import { PositionCard } from "@/components/dashboard/position-card";
 import { PriceCard } from "@/components/dashboard/price-card";
+import { getInvestorOptions } from "@/lib/config/portfolio";
 import type { ApiResponse } from "@/types/api";
 import type { BriefResponse } from "@/types/brief";
 import type { CopilotResponse } from "@/types/copilot";
@@ -25,6 +26,8 @@ type LoadState =
       readonly brief: BriefResponse | null;
     };
 
+const investorOptions = getInvestorOptions();
+
 function isErrorResponse<TData>(
   response: ApiResponse<TData>,
 ): response is Extract<ApiResponse<TData>, { error: unknown }> {
@@ -32,6 +35,9 @@ function isErrorResponse<TData>(
 }
 
 export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
+  const [selectedUserId, setSelectedUserId] = useState<string>(
+    investorOptions[0]?.id ?? "yakiv",
+  );
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
@@ -41,7 +47,11 @@ export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
       setState({ status: "loading" });
 
       try {
-        const copilotResponse = await fetch(`/api/copilot?symbol=${encodeURIComponent(symbol)}`, {
+        const params = new URLSearchParams({
+          user: selectedUserId,
+          symbol,
+        });
+        const copilotResponse = await fetch(`/api/copilot?${params.toString()}`, {
           signal: controller.signal,
         });
         const copilotPayload =
@@ -62,7 +72,7 @@ export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
           brief: null,
         });
 
-        const briefResponse = await fetch(`/api/brief?symbol=${encodeURIComponent(symbol)}`, {
+        const briefResponse = await fetch(`/api/brief?${params.toString()}`, {
           signal: controller.signal,
         });
         const briefPayload =
@@ -97,7 +107,7 @@ export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
     return () => {
       controller.abort();
     };
-  }, [symbol]);
+  }, [selectedUserId, symbol]);
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
@@ -113,7 +123,7 @@ export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
               Portfolio Copilot
             </p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-              {symbol} dashboard
+              {symbol} personal dashboard
             </h1>
           </div>
           <p className="max-w-md text-sm leading-6 text-slate-400">
@@ -122,6 +132,11 @@ export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
           </p>
         </header>
 
+        <UserSwitcher
+          selectedUserId={selectedUserId}
+          onSelect={setSelectedUserId}
+        />
+
         {state.status === "loading" ? <DashboardLoading /> : null}
         {state.status === "error" ? <DashboardError message={state.message} /> : null}
         {state.status === "ready" ? (
@@ -129,6 +144,37 @@ export function PortfolioDashboard({ symbol }: PortfolioDashboardProps) {
         ) : null}
       </div>
     </main>
+  );
+}
+
+function UserSwitcher({
+  selectedUserId,
+  onSelect,
+}: {
+  readonly selectedUserId: string;
+  readonly onSelect: (userId: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-2">
+      {investorOptions.map((investor) => {
+        const isSelected = investor.id === selectedUserId;
+
+        return (
+          <button
+            key={investor.id}
+            type="button"
+            onClick={() => onSelect(investor.id)}
+            className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+              isSelected
+                ? "bg-cyan-300 text-slate-950"
+                : "text-slate-300 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            {investor.displayName}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
