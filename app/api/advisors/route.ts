@@ -1,6 +1,5 @@
 import { apiError, ok } from "@/lib/api/http";
-import { getAdvisorContext } from "@/lib/advisors/build-advisors";
-import { buildCopilotResponse } from "@/lib/copilot/build-copilot";
+import { getAdvisorsResponse } from "@/lib/advisors/build-advisors";
 import { PortfolioNotFoundError } from "@/lib/portfolio/get-portfolio";
 import { normalizeSymbol } from "@/lib/utils/symbol";
 
@@ -14,25 +13,21 @@ export async function GET(request: Request) {
   if (!userId) {
     return apiError(
       "INVALID_USER",
-      "Provide a valid user query parameter, for example /api/copilot?user=yakiv.",
+      "Provide a valid user query parameter, for example /api/advisors?user=yakiv.",
       { status: 400 },
     );
   }
 
   try {
-    const context = await getAdvisorContext({ userId, symbol });
-
-    return ok(buildCopilotResponse(context));
+    return ok(await getAdvisorsResponse({ userId, symbol }));
   } catch (error) {
     if (error instanceof PortfolioNotFoundError) {
       return apiError("PORTFOLIO_NOT_FOUND", error.message, { status: 404 });
     }
 
     const message =
-      error instanceof Error
-        ? error.message
-        : "Unable to build copilot response.";
+      error instanceof Error ? error.message : "Unable to build advisors.";
 
-    return apiError("COPILOT_PROVIDER_ERROR", message, { status: 502 });
+    return apiError("ADVISORS_PROVIDER_ERROR", message, { status: 502 });
   }
 }

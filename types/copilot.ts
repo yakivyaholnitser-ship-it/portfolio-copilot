@@ -1,3 +1,4 @@
+import type { Advisor } from "@/types/advisor";
 import type { DecisionResult } from "@/types/decision";
 import type { FundamentalAdvisor, FundamentalsData } from "@/types/fundamentals";
 import type { IntelligenceResponse } from "@/types/intelligence";
@@ -58,6 +59,7 @@ export interface MorningBrief {
   readonly upcomingEvents: readonly string[];
   readonly estimatedReadingTime: string;
   readonly brains: MorningBriefBrains;
+  readonly advisors: readonly Advisor[];
 }
 
 export interface CopilotResponse {
@@ -70,6 +72,7 @@ export interface CopilotResponse {
   readonly intelligence: IntelligenceResponse;
   readonly fundamentals: FundamentalsData;
   readonly fundamentalAdvisor: FundamentalAdvisor;
+  readonly advisors: readonly Advisor[];
   readonly morningBrief: MorningBrief;
   readonly disclaimer: "Not financial advice.";
 }
