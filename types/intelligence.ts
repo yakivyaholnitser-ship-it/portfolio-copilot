@@ -34,7 +34,7 @@ export interface InsiderTransaction {
   readonly transactionPrice: number | null;
 }
 
-export type ProviderStatus = "available" | "missing_api_key" | "error";
+export type ProviderStatus = "available" | "partial" | "missing_api_key" | "error";
 
 export interface IntelligenceSources {
   readonly finnhub: {

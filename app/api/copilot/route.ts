@@ -1,5 +1,7 @@
 import { apiError, ok } from "@/lib/api/http";
 import { buildCopilotResponse } from "@/lib/copilot/build-copilot";
+import { createFundamentalAdvisor } from "@/lib/fundamentals/fundamental-advisor";
+import { getFundamentals } from "@/lib/fundamentals/get-fundamentals";
 import { getIntelligence } from "@/lib/intelligence/get-intelligence";
 import {
   getPortfolio,
@@ -24,9 +26,20 @@ export async function GET(request: Request) {
 
   try {
     const portfolio = await getPortfolio({ userId, symbol });
-    const intelligence = await getIntelligence(portfolio.symbol);
+    const [intelligence, fundamentals] = await Promise.all([
+      getIntelligence(portfolio.symbol),
+      getFundamentals(portfolio.symbol),
+    ]);
+    const fundamentalAdvisor = createFundamentalAdvisor(fundamentals);
 
-    return ok(buildCopilotResponse(portfolio, intelligence));
+    return ok(
+      buildCopilotResponse(
+        portfolio,
+        intelligence,
+        fundamentals,
+        fundamentalAdvisor,
+      ),
+    );
   } catch (error) {
     if (error instanceof PortfolioNotFoundError) {
       return apiError("PORTFOLIO_NOT_FOUND", error.message, { status: 404 });

@@ -1,4 +1,5 @@
 import type { DecisionResult } from "@/types/decision";
+import type { FundamentalAdvisor, FundamentalsData } from "@/types/fundamentals";
 import type { IntelligenceResponse } from "@/types/intelligence";
 import type { PortfolioPosition } from "@/types/portfolio";
 import type { Quote } from "@/types/quote";
@@ -6,6 +7,7 @@ import type { Quote } from "@/types/quote";
 export type InvestmentBrainKind =
   | "market"
   | "analyst"
+  | "fundamental"
   | "portfolio"
   | "risk"
   | "opportunity"
@@ -40,6 +42,7 @@ export interface ActionRecommendation {
 export interface MorningBriefBrains {
   readonly market: InvestmentBrain;
   readonly analyst: InvestmentBrain;
+  readonly fundamental: InvestmentBrain;
   readonly portfolio: InvestmentBrain;
   readonly risk: InvestmentBrain;
   readonly opportunity: InvestmentBrain;
@@ -65,6 +68,8 @@ export interface CopilotResponse {
   readonly positions: readonly PortfolioPosition[];
   readonly decision: DecisionResult;
   readonly intelligence: IntelligenceResponse;
+  readonly fundamentals: FundamentalsData;
+  readonly fundamentalAdvisor: FundamentalAdvisor;
   readonly morningBrief: MorningBrief;
   readonly disclaimer: "Not financial advice.";
 }

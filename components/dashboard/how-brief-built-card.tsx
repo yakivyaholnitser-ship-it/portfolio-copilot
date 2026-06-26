@@ -10,6 +10,10 @@ const dataSources = [
     value: "Company news, analyst trends, earnings calendar, and insider transactions when FINNHUB_API_KEY is configured.",
   },
   {
+    label: "Financial Modeling Prep API",
+    value: "Income statement, balance sheet, cash flow, key metrics, and financial ratios when FMP_API_KEY is configured.",
+  },
+  {
     label: "User portfolio config",
     value: "Bought price and personal P/L for the selected investor.",
   },

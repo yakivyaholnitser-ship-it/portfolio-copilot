@@ -8,6 +8,7 @@ import type {
   MorningBriefBrains,
 } from "@/types/copilot";
 import type { DecisionResult } from "@/types/decision";
+import type { FundamentalAdvisor, FundamentalsData } from "@/types/fundamentals";
 import type { IntelligenceResponse } from "@/types/intelligence";
 import type { PortfolioResponse } from "@/types/portfolio";
 import type { Quote } from "@/types/quote";
@@ -147,6 +148,26 @@ function PortfolioBrain(portfolio: PortfolioResponse): InvestmentBrain {
     summary,
     clamp(45 + Math.abs(position.gainPercent), 40, 95),
     90,
+  );
+}
+
+function FundamentalBrain(advisor: FundamentalAdvisor): InvestmentBrain {
+  if (advisor.fundamentalHealth.confidence <= 25) {
+    return createBrain(
+      "fundamental",
+      "Fundamental data is unavailable.",
+      advisor.fundamentalHealth.summary,
+      20,
+      advisor.fundamentalHealth.confidence,
+    );
+  }
+
+  return createBrain(
+    "fundamental",
+    `Fundamental Health: ${advisor.fundamentalHealth.score}/100.`,
+    advisor.fundamentalHealth.summary,
+    advisor.fundamentalHealth.score,
+    advisor.fundamentalHealth.confidence,
   );
 }
 
@@ -324,12 +345,15 @@ function BriefEngine(
   const insider = brains.risk.summary.includes("insider selling")
     ? "Insider activity was detected recently."
     : null;
+  const fundamentalBullet =
+    brains.fundamental.confidence > 25 ? brains.fundamental.headline : null;
   const whatChangedOvernight = {
     headline: brains.market.headline,
     bullets: [
       `${portfolio.symbol} ${portfolio.quote.todayChangePercent >= 0 ? "rose" : "fell"} ${formatPercent(portfolio.quote.todayChangePercent)} today.`,
       ...(topNews ? [`Latest news: ${shorten(topNews, 78)}.`] : []),
       brains.analyst.kind === "analyst" ? brains.analyst.summary : "",
+      ...(fundamentalBullet ? [fundamentalBullet] : []),
       insider ??
         (position
           ? `${portfolio.displayName} is ${position.isPositive ? "above" : "below"} entry.`
@@ -341,6 +365,7 @@ function BriefEngine(
     todaysDecision.reason,
     brains.market.summary,
     brains.analyst.summary,
+    brains.fundamental.summary,
     brains.portfolio.summary,
     brains.risk.summary,
     brains.opportunity.summary,
@@ -362,6 +387,8 @@ function BriefEngine(
 export function buildCopilotResponse(
   portfolio: PortfolioResponse,
   intelligence: IntelligenceResponse,
+  fundamentals: FundamentalsData,
+  fundamentalAdvisor: FundamentalAdvisor,
 ): CopilotResponse {
   const decision = scoreStock({
     quote: portfolio.quote,
@@ -370,6 +397,7 @@ export function buildCopilotResponse(
   const brains: MorningBriefBrains = {
     market: MarketBrain(portfolio.quote, intelligence),
     analyst: AnalystBrain(intelligence),
+    fundamental: FundamentalBrain(fundamentalAdvisor),
     portfolio: PortfolioBrain(portfolio),
     risk: RiskBrain(portfolio.quote, intelligence),
     opportunity: OpportunityBrain(portfolio, decision),
@@ -384,6 +412,8 @@ export function buildCopilotResponse(
     positions: portfolio.positions,
     decision,
     intelligence,
+    fundamentals,
+    fundamentalAdvisor,
     morningBrief: BriefEngine(portfolio, decision, brains),
     disclaimer: "Not financial advice.",
   };
